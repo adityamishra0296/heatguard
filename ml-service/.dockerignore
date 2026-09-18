@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+# Do not bake a persisted model: the container trains fresh against the current
+# shared database on startup, keeping predictions in sync with the seeded data.
+models/
+*.joblib

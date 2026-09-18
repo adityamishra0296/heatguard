@@ -1,0 +1,19 @@
+node_modules
+.next
+out
+build
+coverage
+src/generated
+prisma/migrations
+package-lock.json
+*.tsbuildinfo
+next-env.d.ts
+
+# Python virtualenv, caches, and model artifacts for the ml-service
+**/.venv
+**/__pycache__
+ml-service/models
+
+# Test + Playwright output
+test-results
+playwright-report

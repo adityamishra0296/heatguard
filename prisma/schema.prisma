@@ -1,0 +1,122 @@
+// HeatGuard data layer.
+// Learn more: https://pris.ly/d/prisma-schema
+//
+// NOTE: The SQLite connector does not support Prisma `enum` blocks, so the
+// constrained value sets (Region.state, Region.districtType, HeatAlert.level)
+// are stored as `String` and validated at the application layer via the typed
+// unions in `src/lib/enums.ts`, which is the single source of truth.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A monitored district / region within one of the six focus states.
+model Region {
+  id           String   @id @default(cuid())
+  name         String
+  state        String // FocusState — see src/lib/enums.ts
+  districtType String // DistrictType — Urban | Rural | Municipal | Industrial
+  latitude     Float
+  longitude    Float
+  population    Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  temperatureReadings  TemperatureReading[]
+  heatAlerts           HeatAlert[]
+  vulnerablePopulation VulnerablePopulation?
+  recoveryIndicators   RecoveryIndicator[]
+  surveyResponses      SurveyResponse[]
+
+  @@unique([state, name])
+  @@index([state])
+}
+
+/// A single daily telemetry reading for a region.
+model TemperatureReading {
+  id          String   @id @default(cuid())
+  regionId    String
+  timestamp   DateTime
+  maxTempC    Float
+  minTempC    Float
+  humidityPct Float
+  heatIndexC  Float
+  createdAt   DateTime @default(now())
+
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([regionId, timestamp])
+  @@index([regionId, timestamp])
+}
+
+/// An IMD-style early-warning alert derived from heat-index thresholds.
+model HeatAlert {
+  id         String   @id @default(cuid())
+  regionId   String
+  level      String // HeatAlertLevel — NORMAL | YELLOW | ORANGE | RED
+  heatIndexC Float? // heat index that triggered the alert
+  issuedAt   DateTime
+  message    String
+  active     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@index([regionId, issuedAt])
+  @@index([regionId, active])
+}
+
+/// A snapshot of the heat-vulnerable population for a region (one per region).
+model VulnerablePopulation {
+  id                  String   @id @default(cuid())
+  regionId            String   @unique
+  elderlyCount        Int
+  outdoorWorkersCount Int
+  childrenCount       Int
+  hasCoolingAccessPct Float
+  hasWaterAccessPct   Float
+  updatedAt           DateTime @updatedAt
+
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+}
+
+/// Post-event recovery indicators tracked over time for a region.
+model RecoveryIndicator {
+  id                  String   @id @default(cuid())
+  regionId            String
+  date                DateTime
+  hospitalAdmissions  Int
+  workdaysLost        Int
+  cropLossPct         Float
+  electricityFailures Int
+  waterScarcityIndex  Float
+  createdAt           DateTime @default(now())
+
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([regionId, date])
+  @@index([regionId, date])
+}
+
+/// A field/community survey response about heat awareness and access.
+model SurveyResponse {
+  id                    String   @id @default(cuid())
+  regionId              String
+  submittedAt           DateTime
+  awarenessLevel        Int // 1 (low) .. 5 (high)
+  hasHeatPlan           Boolean
+  accessToShade         Boolean
+  accessToDrinkingWater Boolean
+  notes                 String?
+  createdAt             DateTime @default(now())
+
+  region Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@index([regionId, submittedAt])
+}

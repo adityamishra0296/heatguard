@@ -1,0 +1,65 @@
+# Run the full HeatGuard stack locally: the Next.js web app and the FastAPI
+# prediction service, sharing a seeded SQLite database on a named volume.
+#
+#   docker compose up --build
+#
+# Then open http://localhost:3000 (app) and http://localhost:8000/health (ML).
+
+name: heatguard
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: heatguard-web
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/data/dev.db"
+      ML_SERVICE_URL: "http://ml-service:8000"
+      NODE_ENV: "production"
+    volumes:
+      - heatguard-data:/data
+    healthcheck:
+      # Healthy once the API can serve seeded region data.
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://localhost:3000/api/regions').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+    restart: unless-stopped
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    image: heatguard-ml
+    ports:
+      - "8000:8000"
+    environment:
+      HEATGUARD_DB: "/data/dev.db"
+    volumes:
+      - heatguard-data:/data
+    depends_on:
+      # Wait until the web service has seeded the shared database.
+      web:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  heatguard-data:

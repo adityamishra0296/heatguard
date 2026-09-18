@@ -1,0 +1,30 @@
+# Build artefacts and local state (regenerated inside the image).
+node_modules
+.next
+out
+src/generated
+
+# The web container seeds its own database into a shared volume; never bake the
+# host's local database into the image.
+prisma/*.db
+prisma/*.db-journal
+
+# VCS, env, and editor files.
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Tests, reports, and CI-only assets (not needed at runtime).
+tests
+playwright.config.ts
+playwright-report
+test-results
+
+# The prediction service is built from ./ml-service with its own context.
+ml-service
+
+# Docs and misc.
+*.log
+npm-debug.log*
